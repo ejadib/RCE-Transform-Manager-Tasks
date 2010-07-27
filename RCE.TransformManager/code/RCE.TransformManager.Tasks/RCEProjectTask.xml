@@ -1,0 +1,13 @@
+﻿<taskDefinition xmlns="http://schemas.microsoft.com/iis/media/v4/TM/TaskDefinition#">
+  <name>RCE Project Task</name>
+  <id>7F8A89DA-1DF9-409A-9869-A5CDCA017998</id>
+  <properties namespace="http://schemas.microsoft.com/RCE/V1#" prefix="rce">
+    <property name="preset" value="" />
+  </properties>
+  <description xml:lang="en">Invokes Expression Encoder 4 to produce a video based on the edits metadata defined on an RCE Project File</description>
+  <inputDirectory></inputDirectory>
+  <outputDirectory>RCEProjectTaskOutput</outputDirectory>
+  <taskCode>
+    <type architecture="x86" >RCE.TransformManager.Tasks.RCEProjectTask, RCE.TransformManager.Tasks, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null</type>
+  </taskCode>
+</taskDefinition>
