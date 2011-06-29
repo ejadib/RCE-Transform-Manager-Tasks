@@ -17,15 +17,17 @@
 
     using MediaItem = Microsoft.Expression.Encoder.MediaItem;
 
-    public class RCEProjectTask : ITransformTask
+    public class RCEProjectTask : ITask
     {
         private bool initialized;
         private Job job;
-        private ITransformLogger transformLogger;
-        private ITransformMetadata transformMetadata;
-        private ITransformTaskStatus transformTaskStatus;
+        private ILogger transformLogger;
+        private IJobMetadata transformMetadata;
+        private ITaskStatus transformTaskStatus;
 
-        public void Initialize(ITransformTaskStatus status, ITransformMetadata metadata, ITransformLogger logger)
+        private bool disposed;
+
+        public void Initialize(ITaskStatus status, IJobMetadata metadata, ILogger logger)
         {
             if (status == null)
             {
@@ -45,6 +47,7 @@
             this.transformTaskStatus = status;
             this.transformMetadata = metadata;
             this.transformLogger = logger;
+
             this.transformLogger.WriteLine(LogLevel.Verbose, "Before job instantiation");
             this.job = new Job();
             this.transformLogger.WriteLine(LogLevel.Verbose, "After job instantiation");
@@ -64,7 +67,7 @@
             try
             {
                 this.job.Encode();
-                this.transformTaskStatus.UpdateStatus(100, TaskState.Finished, null);
+                this.transformTaskStatus.UpdateStatus(100, JobStatus.Finished, null);
             }
             catch (Exception innerException)
             {
@@ -85,10 +88,26 @@
                     innerException = innerException.InnerException;
                 }
 
-                this.transformTaskStatus.UpdateStatus(100, TaskState.Failed, null);
+                this.transformTaskStatus.UpdateStatus(100, JobStatus.Failed, null);
             }
 
             this.transformLogger.WriteLine(LogLevel.Information, "End encode.");
+        }
+
+        public void Dispose()
+        {
+            this.Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if ((!this.disposed && disposing) && (this.job != null))
+            {
+                this.job.Dispose();
+            }
+
+            this.disposed = true;
         }
 
         private void AssignJobParameters()
@@ -96,8 +115,8 @@
             this.job.CreateSubfolder = false;
             this.job.SaveJobFileToOutputDirectory = false;
             this.job.EncodeProgress += this.OnProgress;
-            this.job.OutputDirectory = this.transformMetadata.OutputDirectory;
-            this.transformLogger.WriteLine(LogLevel.Verbose, "Output directory: " + this.transformMetadata.OutputDirectory);
+            this.job.OutputDirectory = this.transformMetadata.OutputFolder;
+            this.transformLogger.WriteLine(LogLevel.Verbose, "Output directory: " + this.transformMetadata.OutputFolder);
             
             string preset = null;
             IManifestProperty property = this.transformMetadata.GetProperty(RCENamespaces.RCE + "preset");
@@ -238,10 +257,27 @@
 
         private string ExtractVideoPath(Shot shot)
         {
-            string videoFileName =
-                           shot.Source.Resources[0].Ref.Substring(shot.Source.Resources[0].Ref.LastIndexOf("/", StringComparison.OrdinalIgnoreCase) + 1);
+            string shotRef = shot.Source.Resources[0].Ref;
 
-            return Path.Combine(this.transformMetadata.InputDirectory, videoFileName);
+            if (shotRef.EndsWith("/manifest"))
+            {
+                shotRef = shotRef.Remove(shotRef.LastIndexOf("/", StringComparison.OrdinalIgnoreCase));
+            }
+
+            string videoFileName = shotRef.Substring(shotRef.LastIndexOf("/", StringComparison.OrdinalIgnoreCase) + 1);
+
+            if (videoFileName.EndsWith(".ism"))
+            {
+                string ismvPattern = string.Concat(Path.GetFileNameWithoutExtension(videoFileName), "*.ismv");
+                string[] files = Directory.GetFiles(this.transformMetadata.InputFolder, ismvPattern);
+
+                if (files.Length > 0)
+                {
+                    videoFileName = Path.GetFileName(files[0]);
+                }
+            }
+
+            return Path.Combine(this.transformMetadata.InputFolder, videoFileName);
         }
 
         private void OnProgress(object sender, EncodeProgressEventArgs e)
@@ -249,7 +285,7 @@
             ushort percentComplete = (ushort)(((100 / e.TotalPasses) * (e.CurrentPass - 1)) + (((ushort)e.Progress) / e.TotalPasses));
             this.transformLogger.WriteLine(LogLevel.Information, string.Concat(new object[] { "Pass ", e.CurrentPass, " of ", e.TotalPasses, " on ", e.CurrentItem.Name }));
             this.transformLogger.WriteLine(LogLevel.Information, string.Concat(new object[] { "Pass progress = ", e.Progress.ToString(CultureInfo.InvariantCulture), "; total progress = ", percentComplete }));
-            this.transformTaskStatus.UpdateStatus(percentComplete, TaskState.Running, null);
+            this.transformTaskStatus.UpdateStatus(percentComplete, JobStatus.Running, null);
         }
 
         /// <summary>
