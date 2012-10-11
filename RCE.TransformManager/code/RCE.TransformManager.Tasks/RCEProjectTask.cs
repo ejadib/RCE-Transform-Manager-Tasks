@@ -141,7 +141,8 @@
                     string fileName = (string)element.Attribute("src");
                     this.transformLogger.WriteLine(LogLevel.Information, "Transforming file: " + fileName);
 
-                    this.transformLogger.WriteLine(LogLevel.Information, "Deserializing file into RCE project: " + fileName);
+                    this.transformLogger.WriteLine(
+                        LogLevel.Information, "Deserializing file into RCE project: " + fileName);
 
                     string projectXml;
                     using (StreamReader reader = new StreamReader(fileName))
@@ -153,94 +154,103 @@
 
                     this.transformLogger.WriteLine(LogLevel.Information, "Looking for RCE Visual Track");
 
-                    Track track = project.Timeline.SingleOrDefault(t => t.TrackType.ToUpperInvariant() == "VISUAL");
+                    Sequence sequence = project.Sequences.SingleOrDefault();
 
-                    if (track.Shots.Count > 0)
+                    if (sequence != null)
                     {
-                        this.transformLogger.WriteLine(LogLevel.Information, "Adding RCE Shots");
+                        Track track = sequence.Tracks.SingleOrDefault(t => t.TrackType.ToUpperInvariant() == "VISUAL");
 
-                        Shot shot = track.Shots[0];
-
-                        this.transformLogger.WriteLine(LogLevel.Information, "Adding RCE Shot: " + shot.Title);
-
-                        string videoPath = this.ExtractVideoPath(shot);
-
-                        MediaItem item = new MediaItem(videoPath)
-                            {
-                                OutputFileName = Guid.NewGuid() + ".{Default Extension}" 
-                            };
-
-                        item.Sources[0].Clips[0].StartTime =
-                            TimeSpan.FromSeconds(shot.SourceAnchor.MarkIn.GetValueOrDefault());
-
-                        this.transformLogger.WriteLine(LogLevel.Information, "Start Time: " + item.Sources[0].Clips[0].StartTime);
-
-                        item.Sources[0].Clips[0].EndTime =
-                            TimeSpan.FromSeconds(shot.SourceAnchor.MarkOut.GetValueOrDefault());
-
-                        this.transformLogger.WriteLine(LogLevel.Information, "End Time: " + item.Sources[0].Clips[0].EndTime);
-
-                        if (track.Shots.Count > 1)
+                        if (track.Shots.Count > 0)
                         {
-                            for (int i = 1; i < track.Shots.Count; i++)
+                            this.transformLogger.WriteLine(LogLevel.Information, "Adding RCE Shots");
+
+                            Shot shot = track.Shots[0];
+
+                            this.transformLogger.WriteLine(LogLevel.Information, "Adding RCE Shot: " + shot.Title);
+
+                            string videoPath = this.ExtractVideoPath(shot);
+
+                            MediaItem item = new MediaItem(videoPath)
+                                { OutputFileName = Guid.NewGuid() + ".{Default Extension}" };
+
+                            item.Sources[0].Clips[0].StartTime =
+                                TimeSpan.FromSeconds(shot.SourceAnchor.MarkIn.GetValueOrDefault());
+
+                            this.transformLogger.WriteLine(
+                                LogLevel.Information, "Start Time: " + item.Sources[0].Clips[0].StartTime);
+
+                            item.Sources[0].Clips[0].EndTime =
+                                TimeSpan.FromSeconds(shot.SourceAnchor.MarkOut.GetValueOrDefault());
+
+                            this.transformLogger.WriteLine(
+                                LogLevel.Information, "End Time: " + item.Sources[0].Clips[0].EndTime);
+
+                            if (track.Shots.Count > 1)
                             {
-                                shot = track.Shots[i];
-                                this.transformLogger.WriteLine(LogLevel.Information, "Adding RCE Shot: " + shot.Title);
-
-                                videoPath = this.ExtractVideoPath(shot);
-
-                                Source source = new Source(videoPath);
-                                source.Clips[0].StartTime =
-                                    TimeSpan.FromSeconds(shot.SourceAnchor.MarkIn.GetValueOrDefault());
-
-                                this.transformLogger.WriteLine(LogLevel.Information, "Start Time: " + source.Clips[0].StartTime);
-
-                                source.Clips[0].EndTime =
-                                    TimeSpan.FromSeconds(shot.SourceAnchor.MarkOut.GetValueOrDefault());
-                                item.Sources.Add(source);
-
-                                this.transformLogger.WriteLine(LogLevel.Information, "End Time: " + source.Clips[0].EndTime);
-                            }
-                        }
-
-                        OutputMetadata metadata = project.Metadata as OutputMetadata;
-
-                        if (metadata != null)
-                        {
-                            this.transformLogger.WriteLine(LogLevel.Information, "Applying RCE Metadata");
-                            if (!string.IsNullOrEmpty(metadata.Settings.ResizeMode))
-                            {
-                                switch (metadata.Settings.ResizeMode)
+                                for (int i = 1; i < track.Shots.Count; i++)
                                 {
-                                    case "Stretch":
-                                        item.VideoResizeMode = VideoResizeMode.Stretch;
-                                        break;
-                                    case "Letterbox":
-                                        item.VideoResizeMode = VideoResizeMode.Letterbox;
-                                        break;
+                                    shot = track.Shots[i];
+                                    this.transformLogger.WriteLine(
+                                        LogLevel.Information, "Adding RCE Shot: " + shot.Title);
+
+                                    videoPath = this.ExtractVideoPath(shot);
+
+                                    Source source = new Source(videoPath);
+                                    source.Clips[0].StartTime =
+                                        TimeSpan.FromSeconds(shot.SourceAnchor.MarkIn.GetValueOrDefault());
+
+                                    this.transformLogger.WriteLine(
+                                        LogLevel.Information, "Start Time: " + source.Clips[0].StartTime);
+
+                                    source.Clips[0].EndTime =
+                                        TimeSpan.FromSeconds(shot.SourceAnchor.MarkOut.GetValueOrDefault());
+                                    item.Sources.Add(source);
+
+                                    this.transformLogger.WriteLine(
+                                        LogLevel.Information, "End Time: " + source.Clips[0].EndTime);
                                 }
                             }
-                        }
 
-                        if (!string.IsNullOrEmpty(preset))
-                        {
-                            this.transformLogger.WriteLine(LogLevel.Information, "Applying preset");
-                            item.ApplyPreset(preset);
-                        }
+                            OutputMetadata metadata = project.Metadata as OutputMetadata;
 
-                        this.transformLogger.WriteLine(LogLevel.Information, "Adding media item to job");
-
-                        try
-                        {
-                            this.job.MediaItems.Add(item);
-                        }
-                        catch (Exception exception1)
-                        {
-                            exception = exception1;
-                            this.transformLogger.WriteLine(LogLevel.Information, exception.Message);
-                            if (exception.InnerException != null)
+                            if (metadata != null)
                             {
-                                this.transformLogger.WriteLine(LogLevel.Information, exception.InnerException.Message);
+                                this.transformLogger.WriteLine(LogLevel.Information, "Applying RCE Metadata");
+                                if (!string.IsNullOrEmpty(metadata.Settings.ResizeMode))
+                                {
+                                    switch (metadata.Settings.ResizeMode)
+                                    {
+                                        case "Stretch":
+                                            item.VideoResizeMode = VideoResizeMode.Stretch;
+                                            break;
+                                        case "Letterbox":
+                                            item.VideoResizeMode = VideoResizeMode.Letterbox;
+                                            break;
+                                    }
+                                }
+                            }
+
+                            if (!string.IsNullOrEmpty(preset))
+                            {
+                                this.transformLogger.WriteLine(LogLevel.Information, "Applying preset");
+                                item.ApplyPreset(preset);
+                            }
+
+                            this.transformLogger.WriteLine(LogLevel.Information, "Adding media item to job");
+
+                            try
+                            {
+                                this.job.MediaItems.Add(item);
+                            }
+                            catch (Exception exception1)
+                            {
+                                exception = exception1;
+                                this.transformLogger.WriteLine(LogLevel.Information, exception.Message);
+                                if (exception.InnerException != null)
+                                {
+                                    this.transformLogger.WriteLine(
+                                        LogLevel.Information, exception.InnerException.Message);
+                                }
                             }
                         }
                     }
@@ -269,6 +279,9 @@
             if (videoFileName.EndsWith(".ism"))
             {
                 string ismvPattern = string.Concat(Path.GetFileNameWithoutExtension(videoFileName), "*.ismv");
+
+                this.transformLogger.WriteLine(LogLevel.Information, string.Format("Looking for ismv files with pattern {0} on {1}", ismvPattern, this.transformMetadata.InputFolder));
+
                 string[] files = Directory.GetFiles(this.transformMetadata.InputFolder, ismvPattern);
 
                 if (files.Length > 0)
